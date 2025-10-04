@@ -128,7 +128,7 @@ significantly.
 
 ## 🏆 Hackathon Context
 
-Developed as part of a hackathon challenge, this project demonstrates
+Developed as part of a aceathon challenge, this project demonstrates
 how **AI + IoT + Data Analytics** can power the next generation of
 **Smart City traffic ecosystems**.
 
