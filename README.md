@@ -20,8 +20,8 @@ travel time**, and **minimize CO₂ emissions** in cities.
 Urban commuters spend **over 100 hours per year** stuck in traffic,
 wasting time, fuel, and energy.\
 Traditional traffic systems rely on static timers that cannot adapt to
-changing road conditions, leading to: - Longer waiting times\
-- Inefficient traffic flow\
+changing road conditions, leading to: - Longer waiting times
+- Inefficient traffic flow
 - Increased CO₂ emissions and air pollution
 
 This calls for a **dynamic, intelligent solution** that adapts in
@@ -49,13 +49,13 @@ preemptive decisions.
 ## 🧩 System Architecture
 
 **Data Flow:** - **Traffic Data Source:** Real-time feeds (Google Maps,
-OpenStreetMap) or simulated CSV datasets.\
+OpenStreetMap) or simulated CSV datasets.
 - **AI/ML Module:** Predicts congestion patterns using live and
-historical data.\
+historical data.
 - **Backend (Node.js + Express):** Implements adaptive signal logic and
-provides REST APIs.\
+provides REST APIs.
 - **Database:** PostgreSQL (structured logs) and MongoDB (historical
-predictions).\
+predictions).
 - **Frontend:** React.js dashboard with Mapbox/Leaflet for live
 visualization and Chart.js/D3.js for analytics.
 
@@ -85,9 +85,9 @@ visualization and Chart.js/D3.js for analytics.
 
 The dashboard empowers traffic operators with live visual insights: -
 **Dynamic heatmaps** showing congestion severity (Green → Clear, Yellow
-→ Moderate, Red → Heavy)\
+→ Moderate, Red → Heavy)
 - **Junction-level analytics:** vehicle count, average waiting time, and
-signal status\
+signal status
 - **Predictive overlays** showing congestion hotspots up to 30 minutes
 ahead
 
@@ -98,8 +98,8 @@ ahead
 Our adaptive algorithm distributes green light durations proportional to
 traffic volume, optimizing flow across intersections.\
 Machine learning models forecast congestion trends based on: - Time of
-day\
-- Live data inputs\
+day
+- Live data inputs
 - Historical patterns
 
 This allows **preemptive traffic control** and reduces gridlocks
@@ -136,13 +136,13 @@ how **AI + IoT + Data Analytics** can power the next generation of
 
 ## 🚀 Future Scope
 
--   Integration with IoT-enabled smart signals across city networks\
--   Emergency vehicle prioritization and smart parking systems\
+-   Integration with IoT-enabled smart signals across city networks
+-   Emergency vehicle prioritization and smart parking systems
 -   Edge computing for ultra-low latency traffic response
 
 ------------------------------------------------------------------------
 
-## 📂 Repository Structure (Suggested)
+## 📂 Repository Structure
 
     ├── backend/
     │   ├── app.js
