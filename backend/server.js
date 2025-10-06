@@ -50,6 +50,7 @@ const getGreenTimeFromModel = (vehicleCount) => {
 
 // --- API Endpoint ---
 app.post('/api/signal-timings', async (req, res) => {
+    console.log('Received body:', req.body);
     const { ns_vehicles, ew_vehicles } = req.body;
 
     // --- Input Validation ---

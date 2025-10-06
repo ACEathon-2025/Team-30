@@ -35,6 +35,7 @@ const TrafficSliderInput: React.FC = () => {
       if (!response.ok) throw new Error('Failed to get timings');
 
       const data: Timings = await response.json();
+      console.log(data)
       setTimings(data);
     } catch (err) {
       setError((err as Error).message || 'Something went wrong');

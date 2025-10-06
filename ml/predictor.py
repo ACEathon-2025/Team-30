@@ -6,6 +6,8 @@ import sys
 import datetime
 import os
 import numpy as np
+import pandas as pd
+
 
 # --- Step 2: Define the Green Light Calculation Logic ---
 # This function converts the model's prediction (a score from 0-10)
@@ -44,10 +46,10 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # --- Load the Trained Model ---
-    MODEL_FILENAME = 'traffic_model.joblib'
+    MODEL_FILENAME = os.path.join(os.path.dirname(__file__), 'traffic_model.joblib')
     if not os.path.exists(MODEL_FILENAME):
-        print(f"Error: Model file '{MODEL_FILENAME}' not found.")
-        print("Please run the train_model.py script first.")
+        print(f"Error: Model file '{MODEL_FILENAME}' not found.", file=sys.stderr)
+        print("Please run the train_model.py script first.", file=sys.stderr)
         sys.exit(1)
 
     model = joblib.load(MODEL_FILENAME)
@@ -61,7 +63,10 @@ if __name__ == "__main__":
 
     # Create the input array for the model's predict function
     # Note: The model expects a 2D array-like input, so we wrap it in a list.
-    input_features = np.array([[current_hour, current_day_of_week, vehicle_count]])
+    input_features = pd.DataFrame(
+    [[current_hour, current_day_of_week, vehicle_count]],
+    columns=['hour', 'day_of_week', 'vehicle_count']
+)
 
     # --- Make the Prediction ---
     predicted_congestion_score = model.predict(input_features)[0] # Get the first (and only) prediction
