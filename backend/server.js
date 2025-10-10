@@ -13,7 +13,6 @@ let latestData = {
 };
 
 function updateSignalTimings(ns_count, ew_count) {
-  // Simple example: linear scale green times between 10 and 60 seconds
   const computeGreenTime = count => Math.min(Math.max(10, count * 5), 60);
   latestData.timings.ns_time = computeGreenTime(ns_count);
   latestData.timings.ew_time = computeGreenTime(ew_count);

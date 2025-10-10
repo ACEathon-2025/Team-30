@@ -3,22 +3,18 @@ import numpy as np
 import requests
 import time
 
-# Import your ML timing calculation (all files inside ML folder)
+# Import  ML timing calculation (all files inside ML folder)
 from .train_model import calculate_optimized_timing
 
-# ===================================================================================
-# --- CONFIGURATION & CALIBRATION ---
-# ===================================================================================
-CAMERA_URL = "http://10.206.97.185:8080/video"  # Or 0 for webcam
-BACKEND_URL = "http://localhost:5001/api/update-counts"  # Backend expects counts + timings
-UPDATE_INTERVAL = 3  # Time in seconds between backend updates
+CAMERA_URL = "http://10.206.97.185:8080/video"  
+BACKEND_URL = "http://localhost:5001/api/update-counts" 
+UPDATE_INTERVAL = 3  
 
-MIN_CAR_AREA = 500  # Minimum contour area to be considered a car
+MIN_CAR_AREA = 500  
 
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 360
 
-# Original ROIs scaled down from 1920x1080 to 640x360 and widened
 def widen_roi(x1, y1, x2, y2, width_increase=50, height_increase=20):
     center_x = (x1 + x2) // 2
     center_y = (y1 + y2) // 2
@@ -46,15 +42,15 @@ def draw_text_with_background(frame, text, position, font_scale=0.6, color=(255,
 def main():
     cap = cv2.VideoCapture(CAMERA_URL)
     if not cap.isOpened():
-        print(f"❌ Could not open camera stream at {CAMERA_URL}")
+        print(f"Could not open camera stream at {CAMERA_URL}")
         return
 
     backSub = cv2.createBackgroundSubtractorMOG2(history=1000, varThreshold=25, detectShadows=False)
 
-    print("✅ Camera stream opened. System is initializing...")
-    print("🔴 IMPORTANT: Keep the road EMPTY for the first 5 seconds for background calibration.")
+    print("Camera stream opened. System is initializing...")
+    print("IMPORTANT: Keep the road EMPTY for the first 5 seconds for background calibration.")
     time.sleep(5)
-    print("🟢 Calibration complete! You can now place cars on the road.")
+    print("Calibration complete! You can now place cars on the road.")
 
     last_backend_update = time.time()
     latest_counts = {name: 0 for name in ROIS.keys()}
@@ -64,7 +60,7 @@ def main():
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("⚠️ Failed to grab frame. Retrying...")
+            print("Failed to grab frame. Retrying...")
             time.sleep(1)
             continue
 
@@ -106,7 +102,7 @@ def main():
             try:
                 requests.post(BACKEND_URL, json=payload, timeout=2)
             except requests.exceptions.RequestException:
-                print("⚠️ Could not send data to backend.")
+                print("Could not send data to backend.")
 
         cv2.drawContours(frame, detected_cars, -1, (255, 0, 0), 2)
         for name, (x1, y1, x2, y2) in ROIS.items():
@@ -121,7 +117,7 @@ def main():
 
     cap.release()
     cv2.destroyAllWindows()
-    print("🛑 System shutdown.")
+    print("System shutdown.")
 
 if __name__ == "__main__":
     main()

@@ -4,7 +4,7 @@ import TrafficLiveDisplay from './components/TrafficLiveDisplay'
 function App() {
   return (
     <>
-      <p>Hello this is the traffic slider</p>
+      <p>traffic vehicle count in north-south and east-west</p>
       <TrafficLiveDisplay/>
     </>
   )

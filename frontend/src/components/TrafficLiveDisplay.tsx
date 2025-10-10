@@ -43,40 +43,40 @@ const TrafficLiveDisplay: React.FC = () => {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 1000); // fetch every 3s
+    const interval = setInterval(fetchData, 1000); // fetch every 1s
 
     return () => clearInterval(interval);
   }, []);
 
-  if (isLoading) return <div className="p-8 text-center">Connecting to Traffic System...</div>;
-  if (error) return <div className="p-4 bg-red-100 text-red-700 rounded">{error}</div>;
+  if (isLoading) return <div className="p-12 text-center text-3xl">Connecting to Traffic System...</div>;
+  if (error) return <div className="p-6 bg-red-100 text-red-700 rounded text-2xl">{error}</div>;
   if (!timings) return null;
 
   return (
-    <div className="max-w-xl mx-auto p-6 bg-gray-50 rounded shadow">
-      <h2 className="text-2xl font-bold mb-6 text-center">Live Vehicle Counts & Signal Timings</h2>
+    <div className="max-w-4xl mx-auto p-10 bg-gray-50 rounded shadow-lg">
+      <h2 className="text-5xl font-bold mb-8 text-center">Live Vehicle Counts & Signal Timings</h2>
 
-      <div className="mb-6 bg-white p-4 rounded shadow">
-        <h3 className="text-xl font-semibold mb-2">Vehicle Counts</h3>
-        <p>North-South: <strong>{liveCounts.ns_vehicles}</strong></p>
-        <p>East-West: <strong>{liveCounts.ew_vehicles}</strong></p>
+      <div className="mb-10 bg-white p-8 rounded shadow-lg">
+        <h3 className="text-3xl font-semibold mb-4">Vehicle Counts</h3>
+        <p className="text-2xl">North-South: <strong>{liveCounts.ns_vehicles}</strong></p>
+        <p className="text-2xl">East-West: <strong>{liveCounts.ew_vehicles}</strong></p>
       </div>
 
-      <div className="bg-white p-4 rounded shadow">
-        <h3 className="text-xl font-semibold mb-3">Signal Timings (seconds)</h3>
+      <div className="bg-white p-8 rounded shadow-lg">
+        <h3 className="text-3xl font-semibold mb-6">Signal Timings (seconds)</h3>
 
-        <div className="mb-4">
-          <h4 className="font-semibold">North-South</h4>
-          <p>Green: <span className="text-green-600 font-bold">{timings['north-south'].green}</span></p>
-          <p>Yellow: <span className="text-yellow-500 font-bold">{timings['north-south'].yellow}</span></p>
-          <p>Red: <span className="text-red-600 font-bold">{timings['north-south'].red}</span></p>
+        <div className="mb-6">
+          <h4 className="font-semibold text-2xl mb-2">North-South</h4>
+          <p className="text-xl">Green: <span className="text-green-600 font-bold">{timings['north-south'].green}</span></p>
+          <p className="text-xl">Yellow: <span className="text-yellow-500 font-bold">{timings['north-south'].yellow}</span></p>
+          <p className="text-xl">Red: <span className="text-red-600 font-bold">{timings['north-south'].red}</span></p>
         </div>
 
         <div>
-          <h4 className="font-semibold">East-West</h4>
-          <p>Green: <span className="text-green-600 font-bold">{timings['east-west'].green}</span></p>
-          <p>Yellow: <span className="text-yellow-500 font-bold">{timings['east-west'].yellow}</span></p>
-          <p>Red: <span className="text-red-600 font-bold">{timings['east-west'].red}</span></p>
+          <h4 className="font-semibold text-2xl mb-2">East-West</h4>
+          <p className="text-xl">Green: <span className="text-green-600 font-bold">{timings['east-west'].green}</span></p>
+          <p className="text-xl">Yellow: <span className="text-yellow-500 font-bold">{timings['east-west'].yellow}</span></p>
+          <p className="text-xl">Red: <span className="text-red-600 font-bold">{timings['east-west'].red}</span></p>
         </div>
       </div>
     </div>
