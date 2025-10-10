@@ -1,118 +1,117 @@
 import cv2
-from ultralytics import YOLO
+import numpy as np
 import requests
 import time
 
-# --- Configuration ---
-# OPTION 1: Use your phone's IP Webcam (Update the IP and add /video)
-CAMERA_URL = "http://192.168.29.158:8080/video" 
-
-# OPTION 2: Use your laptop's built-in webcam (uncomment the line below)
-# CAMERA_URL = 0
-
+# ===================================================================================
+# --- CONFIGURATION ---
+# ===================================================================================
+# --- YOUR SETUP ---
+CAMERA_URL = "http://192.168.29.92:8080/video" # Or use 0 for webcam
 BACKEND_URL = "http://localhost:5001/api/signal-timings"
-UPDATE_INTERVAL = 5  # How often to send data to the backend (in seconds)
+UPDATE_INTERVAL = 3 # Update backend more frequently
+MIN_CAR_AREA = 500 # The smallest size (in pixels) to be considered a car.
 
-# --- Performance Optimization ---
-# FIX: Process every 3rd frame to make the video smoother.
-# Increase this number (e.g., to 5) if the video is still slow.
-PROCESS_EVERY_N_FRAMES = 3
-
-# Load a pre-trained YOLOv8 model
-model = YOLO('yolov8n.pt')
-
-# --- Define Regions of Interest (ROIs) ---
-# IMPORTANT: These are (x1, y1, x2, y2). Adjust these to fit your camera view.
+# --- YOUR REGIONS OF INTEREST (ROIs) ---
+# These are (x1, y1, x2, y2). Adjust these to perfectly match your camera's view.
 ROIS = {
-    "north": (280, 0, 360, 230),
-    "south": (280, 250, 360, 480),
-    "east": (370, 200, 640, 280),
-    "west": (0, 200, 270, 280)
+    "north": (270, 0, 370, 220),
+    "south": (270, 260, 370, 480),
+    "east": (380, 210, 640, 270),
+    "west": (0, 210, 260, 270)
 }
+# ===================================================================================
 
-def count_cars_in_roi(detections, roi_coords):
-    """Counts how many detected car centers fall within a given ROI."""
-    x1_roi, y1_roi, x2_roi, y2_roi = roi_coords
-    count = 0
-    centers = []
-    for det in detections:
-        box = det.xyxy[0].cpu().numpy().astype(int)
-        center_x = (box[0] + box[2]) // 2
-        center_y = (box[1] + box[3]) // 2
-        centers.append((center_x, center_y))
-        if x1_roi < center_x < x2_roi and y1_roi < center_y < y2_roi:
-            count += 1
-    return count, centers
+def draw_text_with_background(frame, text, position, font_scale=0.6, color=(255, 255, 255)):
+    """Draws text with a black background for better readability."""
+    (w, h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 2)
+    cv2.rectangle(frame, (position[0], position[1] - h - 10), (position[0] + w + 10, position[1]), (0,0,0), -1)
+    cv2.putText(frame, text, (position[0] + 5, position[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, 2)
 
-# --- Main Loop ---
 def main():
     cap = cv2.VideoCapture(CAMERA_URL)
     if not cap.isOpened():
         print(f"❌ Could not open camera stream at {CAMERA_URL}")
         return
 
-    print("✅ Camera stream opened. Starting traffic analysis...")
-    last_update_time = time.time()
-    frame_counter = 0
-    
-    # Initialize variables before the loop to ensure they always exist
-    individual_counts = {name: 0 for name in ROIS.keys()}
-    all_centers = []
-    processed_frame = None
+    # Create the background subtractor object. This is the core of our new detection method.
+    # It learns the background and identifies new objects.
+    backSub = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=50, detectShadows=False)
+
+    print("✅ Camera stream opened. System is initializing...")
+    print("🔴 IMPORTANT: Keep the road EMPTY for the first 5 seconds for background calibration.")
+    time.sleep(5) # Give it time to learn the background
+    print("🟢 Calibration complete! You can now place cars on the road.")
+
+    last_backend_update = time.time()
+    latest_counts = {name: 0 for name in ROIS.keys()}
 
     while True:
         ret, frame = cap.read()
         if not ret:
             print("⚠️ Failed to grab frame. Retrying...")
-            time.sleep(2)
+            time.sleep(1)
             continue
 
         frame = cv2.resize(frame, (640, 480))
-        frame_counter += 1
         
-        # Only perform heavy AI processing on specified frames
-        if frame_counter % PROCESS_EVERY_N_FRAMES == 0:
-            results = model(frame, classes=[2], verbose=False, conf=0.45) # Lowered confidence slightly
-            car_detections = results[0].boxes
-            
-            # Create a clean frame for drawing
-            processed_frame = results[0].plot()
+        # 1. Apply the background subtractor to get a "mask" of the foreground (cars)
+        fgMask = backSub.apply(frame)
+        
+        # 2. Clean up the mask to remove noise
+        # Erode gets rid of small white speckles, Dilate makes the main objects bigger.
+        kernel = np.ones((5,5),np.uint8)
+        fgMask = cv2.erode(fgMask, kernel, iterations=1)
+        fgMask = cv2.dilate(fgMask, kernel, iterations=2)
 
-            # FIX: Update counts and centers in real-time whenever we process a frame
-            temp_centers = []
-            for name, roi in ROIS.items():
-                count, centers = count_cars_in_roi(car_detections, roi)
-                individual_counts[name] = count
-                temp_centers.extend(centers)
-            all_centers = temp_centers
-        else:
-            # For frames we skip, just use the original frame
-            processed_frame = frame.copy()
+        # 3. Find the contours (outlines) of the detected objects
+        contours, _ = cv2.findContours(fgMask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        detected_cars = []
+        for cnt in contours:
+            # If a contour is too small, ignore it (it's likely noise)
+            if cv2.contourArea(cnt) > MIN_CAR_AREA:
+                detected_cars.append(cnt)
 
-        # Only send data to the backend every UPDATE_INTERVAL seconds
+        # 4. Count cars by checking if a contour's center is in an ROI
+        current_counts = {name: 0 for name in ROIS.keys()}
+        for name, (x1, y1, x2, y2) in ROIS.items():
+            for car_contour in detected_cars:
+                # Calculate the center of the contour
+                M = cv2.moments(car_contour)
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    # Check if the center is inside the current ROI
+                    if x1 < cX < x2 and y1 < cY < y2:
+                        current_counts[name] += 1
+        
+        latest_counts = current_counts
+        
+        # 5. Send data to the backend periodically
         current_time = time.time()
-        if current_time - last_update_time >= UPDATE_INTERVAL:
-            last_update_time = current_time
-            ns_count = individual_counts.get("north", 0) + individual_counts.get("south", 0)
-            ew_count = individual_counts.get("east", 0) + individual_counts.get("west", 0)
+        if current_time - last_backend_update >= UPDATE_INTERVAL:
+            last_backend_update = current_time
+            ns_count = latest_counts.get("north", 0) + latest_counts.get("south", 0)
+            ew_count = latest_counts.get("east", 0) + latest_counts.get("west", 0)
             vehicle_counts = {"ns_vehicles": ns_count, "ew_vehicles": ew_count}
-            
-            print(f"-> Sending to backend: NS={ns_count}, EW={ew_count}")
+            print(f"--> SENDING TO BACKEND: {vehicle_counts}")
             try:
                 requests.post(BACKEND_URL, json=vehicle_counts, timeout=2)
-            except requests.exceptions.RequestException as e:
-                print(f"⚠️ Could not send data to backend: {e}")
-        
-        # --- Visual Debugging (drawn on every frame for a smooth experience) ---
-        for name, (x1, y1, x2, y2) in ROIS.items():
-            cv2.rectangle(processed_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            count_text = f"{name}: {individual_counts.get(name, 0)}"
-            cv2.putText(processed_frame, count_text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-        
-        for center in all_centers:
-            cv2.circle(processed_frame, center, 3, (0, 0, 255), -1)
+            except requests.exceptions.RequestException:
+                print("    ⚠️ Could not send data to backend.")
 
-        cv2.imshow("Live Traffic Feed", processed_frame)
+        # --- Visual Display ---
+        # Draw the detected car contours in BLUE
+        cv2.drawContours(frame, detected_cars, -1, (255, 0, 0), 2)
+        
+        # Draw the ROIs and their live counts
+        for name, (x1, y1, x2, y2) in ROIS.items():
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            draw_text_with_background(frame, f"{name.upper()}: {latest_counts.get(name, 0)}", (x1, y1))
+
+        cv2.imshow("Live Traffic Feed", frame)
+        cv2.imshow("Detection Mask", fgMask) # Shows you what the computer "sees"
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
