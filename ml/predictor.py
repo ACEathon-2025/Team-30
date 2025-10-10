@@ -1,30 +1,30 @@
-# ML/predictor.py
 import joblib
 import numpy as np
-from datetime import datetime
+import pandas as pd
+import os
 
-MODEL_PATH = "ML/traffic_model.joblib"
+# Use absolute path relative to this file to locate model in ML folder
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "traffic_model.joblib")
 
-# Load the trained model once
+print(f"Loading model from: {MODEL_PATH}")
 model = joblib.load(MODEL_PATH)
+print("Model loaded successfully.")
 
 def calculate_green_time(congestion_score: float) -> int:
-    """
-    Convert predicted congestion score (0–10) into green light duration (10–60s)
-    """
+    """Convert congestion score (0–10) into green light duration (10–60s)."""
     return int(np.clip((congestion_score / 10) * 60, 10, 60))
 
 def predict_green_time(vehicle_count: int) -> int:
     """
-    Predict green time based on vehicle count and current time/day
+    Predict green time based on vehicle count only.
+    Prints debug info about input features before prediction.
     """
-    now = datetime.now()
-    hour = now.hour
-    day = now.weekday()  # Monday = 0, Sunday = 6
-
-    # Input features
-    features = np.array([[vehicle_count, hour, day]])
-    congestion_score = model.predict(features)[0]
-    green_time = calculate_green_time(congestion_score)
-
-    return green_time
+    # Prepare input DataFrame with correct column name
+    features = pd.DataFrame([[vehicle_count]], columns=["vehicle_count"])
+    try:
+        congestion_score = model.predict(features)[0]
+        green_time = calculate_green_time(congestion_score)
+        return green_time
+    except Exception as e:
+        print(f"⚠️ Prediction error: {e}, falling back to 10s green time.")
+        return 77
