@@ -12,7 +12,9 @@ print("Model loaded successfully.")
 
 def calculate_green_time(congestion_score: float) -> int:
     """Convert congestion score (0–10) into green light duration (10–60s)."""
-    return int(np.clip((congestion_score / 10) * 60, 10, 60))
+    green_time = int(np.clip((congestion_score / 10) * 60, 5, 60))
+    return green_time
+
 
 def predict_green_time(vehicle_count: int) -> int:
     """

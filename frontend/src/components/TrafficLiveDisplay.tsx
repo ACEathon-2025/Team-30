@@ -43,7 +43,7 @@ const TrafficLiveDisplay: React.FC = () => {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 3000); // fetch every 3s
+    const interval = setInterval(fetchData, 1000); // fetch every 3s
 
     return () => clearInterval(interval);
   }, []);
