@@ -2,45 +2,47 @@ import cv2
 from ultralytics import YOLO
 import requests
 import time
-import numpy as np
-import sys
-
-# --- ML Import ---
-try:
-    sys.path.append("ML")
-    from train_model import calculate_optimized_timing
-except ImportError:
-    print("⚠️ Could not import calculate_optimized_timing. Using fallback timings.")
-    def calculate_optimized_timing(ns_count, ew_count):
-        return {"ns_time": 10, "ew_time": 10}
 
 # --- Configuration ---
-CAMERA_URL = "http://10.206.97.185:8080"  # Update to your IP webcam URL
-BACKEND_URL = "http://localhost:5001/api/update-counts"
+# OPTION 1: Use your phone's IP Webcam (Update the IP and add /video)
+CAMERA_URL = "http://192.168.29.158:8080/video" 
 
-# Load YOLOv8 model
-model = YOLO("yolov8n.pt")
+# OPTION 2: Use your laptop's built-in webcam (uncomment the line below)
+# CAMERA_URL = 0
 
-# Define Regions of Interest (ROIs) for each lane
+BACKEND_URL = "http://localhost:5001/api/signal-timings"
+UPDATE_INTERVAL = 5  # How often to send data to the backend (in seconds)
+
+# --- Performance Optimization ---
+# FIX: Process every 3rd frame to make the video smoother.
+# Increase this number (e.g., to 5) if the video is still slow.
+PROCESS_EVERY_N_FRAMES = 3
+
+# Load a pre-trained YOLOv8 model
+model = YOLO('yolov8n.pt')
+
+# --- Define Regions of Interest (ROIs) ---
+# IMPORTANT: These are (x1, y1, x2, y2). Adjust these to fit your camera view.
 ROIS = {
-    "north": (300, 100, 340, 200),
-    "south": (300, 280, 340, 380),
-    "east": (400, 220, 500, 260),
-    "west": (140, 220, 240, 260)
+    "north": (280, 0, 360, 230),
+    "south": (280, 250, 360, 480),
+    "east": (370, 200, 640, 280),
+    "west": (0, 200, 270, 280)
 }
 
 def count_cars_in_roi(detections, roi_coords):
-    x_min, y_min, x_max, y_max = roi_coords
+    """Counts how many detected car centers fall within a given ROI."""
+    x1_roi, y1_roi, x2_roi, y2_roi = roi_coords
     count = 0
+    centers = []
     for det in detections:
-        if len(det.xyxy) == 0:
-            continue
         box = det.xyxy[0].cpu().numpy().astype(int)
-        x1, y1, x2, y2 = box[0], box[1], box[2], box[3]
-        center_x, center_y = (x1 + x2) // 2, (y1 + y2) // 2
-        if x_min <= center_x <= x_max and y_min <= center_y <= y_max:
+        center_x = (box[0] + box[2]) // 2
+        center_y = (box[1] + box[3]) // 2
+        centers.append((center_x, center_y))
+        if x1_roi < center_x < x2_roi and y1_roi < center_y < y2_roi:
             count += 1
-    return count
+    return count, centers
 
 # --- Main Loop ---
 def main():
@@ -50,55 +52,70 @@ def main():
         return
 
     print("✅ Camera stream opened. Starting traffic analysis...")
+    last_update_time = time.time()
+    frame_counter = 0
+    
+    # Initialize variables before the loop to ensure they always exist
+    individual_counts = {name: 0 for name in ROIS.keys()}
+    all_centers = []
+    processed_frame = None
 
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("⚠️ Failed to grab frame. Retrying in 2s...")
-            cap.release()
+            print("⚠️ Failed to grab frame. Retrying...")
             time.sleep(2)
-            cap = cv2.VideoCapture(CAMERA_URL)
             continue
 
-        try:
-            frame = cv2.resize(frame, (640, 480))
-        except cv2.error as e:
-            print(f"⚠️ Error resizing frame: {e}")
-            continue
+        frame = cv2.resize(frame, (640, 480))
+        frame_counter += 1
+        
+        # Only perform heavy AI processing on specified frames
+        if frame_counter % PROCESS_EVERY_N_FRAMES == 0:
+            results = model(frame, classes=[2], verbose=False, conf=0.45) # Lowered confidence slightly
+            car_detections = results[0].boxes
+            
+            # Create a clean frame for drawing
+            processed_frame = results[0].plot()
 
-        results = model(frame, classes=[2], verbose=False, conf=0.5)
-        car_detections = results[0].boxes
+            # FIX: Update counts and centers in real-time whenever we process a frame
+            temp_centers = []
+            for name, roi in ROIS.items():
+                count, centers = count_cars_in_roi(car_detections, roi)
+                individual_counts[name] = count
+                temp_centers.extend(centers)
+            all_centers = temp_centers
+        else:
+            # For frames we skip, just use the original frame
+            processed_frame = frame.copy()
 
-        ns_count = count_cars_in_roi(car_detections, ROIS["north"]) + count_cars_in_roi(car_detections, ROIS["south"])
-        ew_count = count_cars_in_roi(car_detections, ROIS["east"]) + count_cars_in_roi(car_detections, ROIS["west"])
-        raw_counts = {"ns_vehicles": ns_count, "ew_vehicles": ew_count}
-
-        try:
-            optimized_times = calculate_optimized_timing(ns_count, ew_count)
-        except Exception as e:
-            print(f"⚠️ ML model error: {e}. Using fallback timings.")
-            optimized_times = {"ns_time": 10, "ew_time": 10}
-
-        # Draw detections and ROIs
-        frame = results[0].plot()
+        # Only send data to the backend every UPDATE_INTERVAL seconds
+        current_time = time.time()
+        if current_time - last_update_time >= UPDATE_INTERVAL:
+            last_update_time = current_time
+            ns_count = individual_counts.get("north", 0) + individual_counts.get("south", 0)
+            ew_count = individual_counts.get("east", 0) + individual_counts.get("west", 0)
+            vehicle_counts = {"ns_vehicles": ns_count, "ew_vehicles": ew_count}
+            
+            print(f"-> Sending to backend: NS={ns_count}, EW={ew_count}")
+            try:
+                requests.post(BACKEND_URL, json=vehicle_counts, timeout=2)
+            except requests.exceptions.RequestException as e:
+                print(f"⚠️ Could not send data to backend: {e}")
+        
+        # --- Visual Debugging (drawn on every frame for a smooth experience) ---
         for name, (x1, y1, x2, y2) in ROIS.items():
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, name, (x1 + 5, y1 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            cv2.rectangle(processed_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            count_text = f"{name}: {individual_counts.get(name, 0)}"
+            cv2.putText(processed_frame, count_text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        
+        for center in all_centers:
+            cv2.circle(processed_frame, center, 3, (0, 0, 255), -1)
 
-        cv2.putText(frame, f"NS: {ns_count} | OPT: {optimized_times['ns_time']}s", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        cv2.putText(frame, f"EW: {ew_count} | OPT: {optimized_times['ew_time']}s", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.imshow("Live Traffic Feed", processed_frame)
 
-        # Send to backend
-        try:
-            requests.post(BACKEND_URL, json=optimized_times, timeout=2)
-        except requests.exceptions.RequestException as e:
-            print(f"⚠️ Could not send to backend: {e}")
-
-        cv2.imshow("Live Traffic Feed", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-
-        time.sleep(5)
 
     cap.release()
     cv2.destroyAllWindows()
@@ -106,3 +123,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
