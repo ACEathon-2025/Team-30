@@ -6,7 +6,7 @@ import time
 # Import  ML timing calculation (all files inside ML folder)
 from .train_model import calculate_optimized_timing
 
-CAMERA_URL = "http://10.206.97.185:8080/video"  
+CAMERA_URL = "http://100.70.1.10:8080/video"  
 BACKEND_URL = "http://localhost:5001/api/update-counts" 
 UPDATE_INTERVAL = 3  
 
