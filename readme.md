@@ -56,8 +56,7 @@ historical data.
 provides REST APIs.
 - **Database:** PostgreSQL (structured logs) and MongoDB (historical
 predictions).
-- **Frontend:** React.js dashboard with Mapbox/Leaflet for live
-visualization and Chart.js/D3.js for analytics.
+- **Traffic Signal Hardware:** Receives dynamic timing updates
 
 ------------------------------------------------------------------------
 
@@ -71,9 +70,7 @@ visualization and Chart.js/D3.js for analytics.
   **AI/ML Models**            Random Forest, LSTM (scikit-learn,
                               TensorFlow)
 
-  **Databases**               PostgreSQL, MongoDB
-
-  **Frontend**                React.js, Leaflet/Mapbox, Chart.js, D3.js
+  **Databases**               PostgreSQL
 
   **Integration**             REST APIs for real-time data and emergency
                               vehicle events
